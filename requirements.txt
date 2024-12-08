@@ -1,0 +1,15 @@
+certifi==2024.8.30
+charset-normalizer==3.4.0
+idna==3.10
+protobuf==5.29.1
+python-dateutil==2.9.0.post0
+python-dotenv==1.0.1
+requests==2.32.3
+schedule==1.2.2
+six==1.17.0
+SQLAlchemy==2.0.36
+typing_extensions==4.12.2
+upstox-python-sdk==2.9.0
+urllib3==2.2.3
+uuid==1.30
+websocket-client==1.8.0
