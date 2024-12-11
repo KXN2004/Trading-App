@@ -1,0 +1,25 @@
+# Ignore python cache files
+__pycache__
+
+# Ignore virtual environment files
+.venv/
+venv/
+
+# Ignore IDE files
+.vscode/
+.idea/
+
+# Ignore macOS directory files
+.DS_Store
+
+# Ignore markdown files
+*.md
+
+# Ignore Docker files
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Ignore git files
+.git/
+.gitignore

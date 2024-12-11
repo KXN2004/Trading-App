@@ -16,20 +16,11 @@ def last_two_thursdays(year, month: date.day) -> tuple[date.day, date.day]:
     """Return the last two Thursdays of the given month"""
     if month < 0 or month > 12:
         raise Exception("Invalid month!")
-
-        # Get the last day of the month
     _, last_day = calendar.monthrange(year, month)
-
-    # Start from the last day of the month and work backwards
     last_day_date = date(year, month, last_day)
-
-    # Find the last Thursday
     days_back = (last_day_date.weekday() - 3) % 7
     last_thursday = last_day_date - timedelta(days=days_back)
-
-    # Find the second-to-last Thursday
     second_last_thursday = last_thursday - timedelta(days=7)
-
     return last_thursday.day, second_last_thursday.day
 
 
