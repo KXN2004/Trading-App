@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import NoResultFound
-from requests import get as get_request, post as post_request
+from httpx import get as get_request, post as post_request
 
 from models import Instruments, Credentials, Clients
 from config import DATABASE, NIFTY, Options, today, YES

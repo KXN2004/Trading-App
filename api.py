@@ -15,7 +15,10 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return PlainTextResponse(
+        status_code=status.HTTP_200_OK,
+        content="Connected to Upstox Auth Service!"
+    )
 
 
 @app.get("/login/{client_id}")
@@ -37,6 +40,7 @@ def login(client_id: str):
             "response_type": "code",
         }
         return RedirectResponse(
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
             url=f"{login_endpoint}?{urlencode(query_params)}",
         )
 
