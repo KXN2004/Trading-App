@@ -27,6 +27,3 @@ LIVE = "Live"
 DATABASE = getenv("DB_PATH")
 LOGIN_URL = getenv("LOGIN_URL")
 REDIRECT_URL = getenv("REDIRECT_URL")
-
-if DATABASE[-3:] != ".db":
-    raise Exception("Invalid SQLite Database file!")

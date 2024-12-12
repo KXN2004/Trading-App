@@ -1,5 +1,10 @@
 from fastapi import FastAPI
-from fastapi.responses import PlainTextResponse, RedirectResponse, HTMLResponse
+from fastapi.responses import (
+    FileResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    HTMLResponse,
+)
 from starlette import status
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -13,12 +18,9 @@ from urllib.parse import urlencode
 app = FastAPI()
 
 
-@app.get("/")
-def read_root():
-    return PlainTextResponse(
-        status_code=status.HTTP_200_OK,
-        content="Connected to Upstox Auth Service!"
-    )
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse("favicon.ico")
 
 
 @app.get("/login/{client_id}")
