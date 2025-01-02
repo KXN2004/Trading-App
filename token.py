@@ -16,7 +16,7 @@ database = Session()
 
 api_instance = LoginApi()
 
-# FE6912: 251176 https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=abc493ca-87de-4730-bc61-c01ce7d76d27&state=FE6912&redirect_uri=http://localhost:8000/callback
+# FE6912: 251176 https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=abc493ca-87de-4730-bc61-c01ce7d76d27&state=FE6912&redirect_uri=https://manually-learning-cow.ngrok-free.app/callback
 # 42AFJE: 240220 https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=4386a770-aed7-4e7f-8cb2-663b778e4457&redirect_uri=https://account.upstox.com/contact-info/
 # 6CAB9R: 006474 https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=2988abaa-c17e-4428-a43f-0fc7f22205b0&redirect_uri=https://account.upstox.com/contact-info/
 # 6GALGR: 653278 https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=465ab58e-8e35-4b09-a289-e813d59d73f0&redirect_uri=https://account.upstox.com/contact-info/

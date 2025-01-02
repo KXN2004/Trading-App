@@ -1,8 +1,10 @@
 from os import getenv
 from dotenv import load_dotenv
 from datetime import date
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-load_dotenv()
+load_dotenv("/Users/kevin/PycharmProjects/Trading-App/.env")
 
 
 class Options:
@@ -10,7 +12,7 @@ class Options:
     PUT = "PE"
 
 
-today = date(2024, 12, 5)
+today = date(2025, 1, 2)
 # today = date.today()
 day = today.day
 year = today.year

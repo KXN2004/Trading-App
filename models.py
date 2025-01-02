@@ -1,5 +1,9 @@
 from copy import deepcopy
+from pydantic import BaseModel
+from secrets import token_hex
 from datetime import datetime
+from typing import List
+from httpx import post as post_request
 from sqlalchemy import (
     create_engine,
     Column,
@@ -9,10 +13,53 @@ from sqlalchemy import (
     Float,
     DateTime,
 )
+
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from config import DATABASE, NOT_AVAILABLE
 
+from enums import *
+
 Base = declarative_base()
+engine = create_engine(f"sqlite:///{DATABASE}")
+session = sessionmaker(bind=engine)
+database = session()
+
+
+class Order(BaseModel):
+    instrument_token: str
+    price: float
+    quantity: int
+    trigger_price: float
+    disclosed_quantity: int
+    is_amo: bool
+    product: Product
+    validity: Validity
+    order_type: OrderType
+    transaction_type: TransactionType
+
+    def __init__(
+        self,
+        instrument_token: str,
+        price: float,
+        quantity: int,
+        trigger_price: float,
+        disclosed_quantity: int,
+        is_amo: bool,
+        product: Product,
+        validity: Validity,
+        order_type: OrderType,
+        transaction_type: TransactionType,
+    ):
+        self.instrument_token = instrument_token
+        self.price = price
+        self.quantity = quantity
+        self.trigger_price = trigger_price
+        self.disclosed_quantity = disclosed_quantity
+        self.is_amo = is_amo
+        self.product = product.value
+        self.validity = validity.value
+        self.order_type = order_type.value
+        self.transaction_type = transaction_type.value
 
 
 class Credentials(Base):
@@ -45,7 +92,16 @@ class Clients(Base):
     m_to_m = Column("MTM", Integer, default=0)
 
     def __repr__(self):
-        return f'<Client(ClientId="{self.client_id}")>'
+        return f'<Clients(ClientId="{self.client_id}")>'
+
+
+class Strategies(Base):
+    __tablename__ = "Strategies"
+
+    client_id = Column(
+        "ClientId", String, ForeignKey(Credentials.client_id), primary_key=True
+    )
+    iron_fly = Column("IronFly", String, default=False)
 
 
 class Instruments(Base):
@@ -97,8 +153,55 @@ class LiveStrategy(Base):
             session.close()
 
 
-engine = create_engine(f"sqlite:///{DATABASE}")
+class Client:
+    last_op = dict()
+
+    def __init__(self, client: Credentials) -> None:
+        self.client_id = client.client_id
+        self.access_token = database.get(Credentials, self.client_id).access_token
+        self.strategy = database.get(Strategies, self.client_id)
+        Client.last_op[self.client_id] = dict()
+
+    def live_strategy(self) -> List[LiveStrategy]:
+        return (
+            database
+            .query(LiveStrategy)
+            .filter_by(client_id=self.client_id, status=Status.LIVE.value)
+        )
+
+    def place_multiple_orders(self, *args: Order) -> None:
+        data: List[Order] = list()
+        for order in args:
+            if order.transaction_type == TransactionType.CLOSE.value:
+                if (
+                    Client.last_op[self.client_id][order.instrument_token]
+                    == TransactionType.BUY.value
+                ):
+                    order.transaction_type = TransactionType.SELL.value
+                else:
+                    order.transaction_type = TransactionType.BUY.value
+
+            Client.last_op[self.client_id][
+                order.instrument_token
+            ] = order.transaction_type
+
+            order.quantity = self.strategy.iron_fly
+            order.correlation_id = token_hex(3)
+            data.append(order.model_dump())
+        try:
+            response = post_request(
+                url="https://api.upstox.com/v2/order/multi/place",
+                json=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "Authorization": f"Bearer {self.access_token}",
+                },
+            )
+            print("Response Code:", response.status_code)
+            print("Response Body:", response.json())
+        except Exception as e:
+            print("Error while placing multiple orders:", str(e))
+
 Base.metadata.create_all(engine, checkfirst=True)
-session = sessionmaker(bind=engine)
-database = session()
 database.close()

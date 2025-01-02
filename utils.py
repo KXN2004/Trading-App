@@ -5,12 +5,17 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import NoResultFound
 from httpx import get as get_request, post as post_request
 
-from models import Instruments, Credentials, Clients
+from enums import *
+from models import Instruments, Credentials, Clients, Client, Order
 from config import DATABASE, NIFTY, Options, today, YES
 
-engine = create_engine(f'sqlite:///{DATABASE}')
+engine = create_engine(f"sqlite:///{DATABASE}")
 Session = sessionmaker(bind=engine)
 database = Session()
+active_clients: list[Client] = list()
+for client in database.query(Credentials).filter_by(is_active=True).all():
+    active_clients.append(Client(client))
+
 
 def last_two_thursdays(year, month: date.day) -> tuple[date.day, date.day]:
     """Return the last two Thursdays of the given month"""
@@ -27,8 +32,7 @@ def last_two_thursdays(year, month: date.day) -> tuple[date.day, date.day]:
 def get_access_token(client: Clients) -> str:
     """Return the access token of the given client"""
     return (
-        database
-        .query(Credentials)
+        database.query(Credentials)
         .filter_by(client_id=client.client_id)
         .one()
         .access_token
@@ -37,61 +41,59 @@ def get_access_token(client: Clients) -> str:
 
 def get_symbol(strike: int, option: Options) -> str:
     """Return the symbol of the given strike and option"""
-    return NIFTY + today.strftime('%y%b').upper() + str(strike) + option
+    return NIFTY + today.strftime("%y%b").upper() + str(strike) + option
 
 
 def get_token(tradingsymbol: str) -> str:
     """Return the token of the given tradingsymbol"""
     try:
         return (
-            database
-            .query(Instruments)
+            database.query(Instruments)
             .filter_by(trading_symbol=tradingsymbol)
             .one()
             .instrument_key
         )
     except NoResultFound:
-        raise Exception('The given tradingsymbol is not in Instruments!')
+        raise Exception("The given tradingsymbol is not in Instruments!")
 
 
 def get_ltp(tradingsymbol: str) -> float:
     """Return the last traded price of the given tradingsymbol"""
     token = get_token(tradingsymbol)
-    instrument = token.split('|')[0] + f":{tradingsymbol}"
-    access_token = database.query(Credentials).filter_by(is_active=YES).first().access_token
+    instrument = token.split("|")[0] + f":{tradingsymbol}"
+    access_token = get_access_token(active_clients[0])
     try:
         response = get_request(
-            url='https://api.upstox.com/v2/market-quote/ltp',
+            url="https://api.upstox.com/v2/market-quote/ltp",
             headers={
-                'accept': 'application/json',
-                'Authorization': f'Bearer {access_token}'
+                "accept": "application/json",
+                "Authorization": f"Bearer {access_token}",
             },
-            params={'instrument_key': token}
+            params={"instrument_key": token},
         )
-        ltp = response.json()['data'][instrument]['last_price']
+        ltp = response.json()["data"][instrument]["last_price"]
         return ltp
     except Exception as error:
-        print('Error when fetching LTP:', error)
+        print("Error when fetching LTP:", error)
 
 
 def get_nifty_price() -> float:
     """Return the last traded price of NIFTY"""
     token = get_token(NIFTY)
-    access_token = database.query(Credentials).filter_by(is_active=YES).first().access_token
+    access_token = get_access_token(active_clients[0])
     try:
         response = get_request(
-            url='https://api.upstox.com/v2/market-quote/ltp',
+            url="https://api.upstox.com/v2/market-quote/ltp",
             headers={
-                'accept': 'application/json',
-                'Authorization': f'Bearer {access_token}'
+                "accept": "application/json",
+                "Authorization": f"Bearer {access_token}",
             },
-            params={'instrument_key': token},
-            data={}
+            params={"instrument_key": token},
         )
-        ltp = response.json()['data'][token.replace('|', ':')]['last_price']
+        ltp = response.json()["data"][token.replace("|", ":")]["last_price"]
         return ltp
     except Exception as error:
-        print('Error when fetching nifty price:', error)
+        print("Error when fetching nifty price:", error)
 
 
 def nearest_price(price: float, step: int = 50) -> int:
@@ -103,30 +105,76 @@ def nearest_price(price: float, step: int = 50) -> int:
         return int(price + (step - remainder))
 
 
-def place_order(client: Clients) -> int:
-    access_token = get_access_token(client)
-    try:
-        response = post_request(
-            url='https://api-hft.upstox.com/v2/order/place',
-            headers={
-                'Content-Type': 'application/json',
-                'accept': 'application/json',
-                'Authorization': f'Bearer {access_token}'
-            },
-            json={
-                'instrument_key': 'NSE|NIFTY 50',
-                'exchange': 'NSE',
-                'order_type': 'LIMIT',
-                'order_varient': 'REGULAR',
-                'product': 'CNC',
-                'transaction_type': 'BUY',
-                'quantity': 1,
-                'price': 1000,
-                'trigger_price': 1000
-            }
-        )
-        return int(response.json()['data']['order_id'])
-    except Exception as error:
-        print('Eror when placing order:', error)
+def buy(
+    tradingsymbol: str,
+    price: float = 0,
+    quantity: int = 0,
+    trigger_price: float = 0,
+    disclosed_quantity: int = 0,
+    is_amo: bool = False,
+    product: Product = Product.DELIVERY,
+    validity: Validity = Validity.DAY,
+):
+    return Order(
+        instrument_token=get_token(tradingsymbol),
+        transaction_type=TransactionType.BUY,
+        price=price,
+        quantity=quantity,
+        trigger_price=trigger_price,
+        disclosed_quantity=disclosed_quantity,
+        is_amo=is_amo,
+        product=product,
+        validity=validity,
+        order_type=OrderType.Market if price == 0 else OrderType.LIMIT,
+    )
+
+
+def sell(
+    tradingsymbol: str,
+    price: float = 0,
+    quantity: int = 0,
+    trigger_price: float = 0,
+    disclosed_quantity: int = 0,
+    is_amo: bool = False,
+    product: Product = Product.DELIVERY,
+    validity: Validity = Validity.DAY,
+):
+    return Order(
+        instrument_token=get_token(tradingsymbol),
+        transaction_type=TransactionType.SELL,
+        price=price,
+        quantity=quantity,
+        trigger_price=trigger_price,
+        disclosed_quantity=disclosed_quantity,
+        is_amo=is_amo,
+        product=product,
+        validity=validity,
+        order_type=OrderType.Market if price == 0 else OrderType.LIMIT,
+    )
+
+
+def close(
+    tradingsymbol: str,
+    price: float = 0,
+    quantity: int = 0,
+    trigger_price: float = 0,
+    disclosed_quantity: int = 0,
+    is_amo: bool = False,
+    product: Product = Product.DELIVERY,
+    validity: Validity = Validity.DAY,
+):
+    return Order(
+        instrument_token=get_token(tradingsymbol),
+        transaction_type=TransactionType.CLOSE,
+        price=price,
+        quantity=quantity,
+        trigger_price=trigger_price,
+        disclosed_quantity=disclosed_quantity,
+        is_amo=is_amo,
+        product=product,
+        validity=validity,
+        order_type=OrderType.Market if price == 0 else OrderType.LIMIT,
+    )
+
 
 database.close()
