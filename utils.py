@@ -1,12 +1,14 @@
+from typing import List
+
 import calendar
 from datetime import date, timedelta
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, update
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import NoResultFound
 from httpx import get as get_request, post as post_request
 
 from enums import *
-from models import Instruments, Credentials, Clients, Client, Order
+from models import Instruments, Credentials, IronFly, Clients, Client, Order
 from config import DATABASE, NIFTY, Options, today, YES
 
 engine = create_engine(f"sqlite:///{DATABASE}")
@@ -14,7 +16,7 @@ Session = sessionmaker(bind=engine)
 database = Session()
 active_clients: list[Client] = list()
 for client in database.query(Credentials).filter_by(is_active=True).all():
-    active_clients.append(Client(client))
+    active_clients.append(Client(client.client_id))
 
 
 def last_two_thursdays(year, month: date.day) -> tuple[date.day, date.day]:
@@ -31,12 +33,7 @@ def last_two_thursdays(year, month: date.day) -> tuple[date.day, date.day]:
 
 def get_access_token(client: Clients) -> str:
     """Return the access token of the given client"""
-    return (
-        database.query(Credentials)
-        .filter_by(client_id=client.client_id)
-        .one()
-        .access_token
-    )
+    return database.get(Credentials, client.client_id).access_token
 
 
 def get_symbol(strike: int, option: Options) -> str:
@@ -47,12 +44,7 @@ def get_symbol(strike: int, option: Options) -> str:
 def get_token(tradingsymbol: str) -> str:
     """Return the token of the given tradingsymbol"""
     try:
-        return (
-            database.query(Instruments)
-            .filter_by(trading_symbol=tradingsymbol)
-            .one()
-            .instrument_key
-        )
+        return database.get(Instruments, tradingsymbol).instrument_key
     except NoResultFound:
         raise Exception("The given tradingsymbol is not in Instruments!")
 
@@ -75,6 +67,46 @@ def get_ltp(tradingsymbol: str) -> float:
         return ltp
     except Exception as error:
         print("Error when fetching LTP:", error)
+
+
+def get_bid(tradingsymbol: str) -> float:
+    """Return the last traded price of the given tradingsymbol"""
+    token = get_token(tradingsymbol)
+    instrument = token.split("|")[0] + f":{tradingsymbol}"
+    access_token = get_access_token(active_clients[0])
+    try:
+        response = get_request(
+            url="https://api.upstox.com/v2/market-quote/quotes",
+            headers={
+                "accept": "application/json",
+                "Authorization": f"Bearer {access_token}",
+            },
+            params={"instrument_key": token},
+        )
+        bid = response.json()["data"][instrument]["depth"]["buy"][0]["price"]
+        return bid + 0.05
+    except Exception as error:
+        print("Error when fetching ask:", error)
+
+
+def get_ask(tradingsymbol: str) -> float:
+    """Return the last traded price of the given tradingsymbol"""
+    token = get_token(tradingsymbol)
+    instrument = token.split("|")[0] + f":{tradingsymbol}"
+    access_token = get_access_token(active_clients[0])
+    try:
+        response = get_request(
+            url="https://api.upstox.com/v2/market-quote/quotes",
+            headers={
+                "accept": "application/json",
+                "Authorization": f"Bearer {access_token}",
+            },
+            params={"instrument_key": token},
+        )
+        ask = response.json()["data"][instrument]["depth"]["sell"][0]["price"]
+        return ask - 0.05
+    except Exception as error:
+        print("Error when fetching ask:", error)
 
 
 def get_nifty_price() -> float:
@@ -105,6 +137,14 @@ def nearest_price(price: float, step: int = 50) -> int:
         return int(price + (step - remainder))
 
 
+def complete_rows() -> List[IronFly]:
+    return database.query(IronFly).filter(status=Status.COMPLETE).all()
+
+
+def open_rows() -> List[IronFly]:
+    return database.query(IronFly).filter(status=Status.OPEN).all()
+
+
 def buy(
     tradingsymbol: str,
     price: float = 0,
@@ -125,7 +165,7 @@ def buy(
         is_amo=is_amo,
         product=product,
         validity=validity,
-        order_type=OrderType.Market if price == 0 else OrderType.LIMIT,
+        order_type=OrderType.MARKET if price == 0 else OrderType.LIMIT,
     )
 
 

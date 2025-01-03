@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-load_dotenv("/Users/kevin/PycharmProjects/Trading-App/.env")
+load_dotenv()
 
 
 class Options:
@@ -12,8 +12,8 @@ class Options:
     PUT = "PE"
 
 
-today = date(2025, 1, 2)
-# today = date.today()
+today = date.today()
+# today = date(2025, 1, 2)
 day = today.day
 year = today.year
 month = today.month

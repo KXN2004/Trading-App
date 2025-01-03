@@ -1,33 +1,34 @@
-from enum import Enum
-
-
-class Status(Enum):
+class Status:
     LIVE = "LIVE"
     CLOSED = "CLOSED"
+    OPEN = "OPEN"
+    REJECTED = "REJECTED"
+    PARTIAL = "PARTIAL"
+    COMPLETE = "complete"
 
 
-class Close(Enum):
+class Close:
     BUY = 0
     SELL = 1
 
 
-class TransactionType(Enum):
+class TransactionType:
     BUY = "BUY"
     SELL = "SELL"
     CLOSE = "CLOSE"
 
 
-class Product(Enum):
+class Product:
     DELIVERY = "D"
     INTRADAY = "I"
 
 
-class Validity(Enum):
+class Validity:
     DAY = "DAY"
     IOC = "IOC"
 
 
-class OrderType(Enum):
+class OrderType:
     MARKET = "MARKET"
     LIMIT = "LIMIT"
     STOPLOSS_LIMIT = "SL"
