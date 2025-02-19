@@ -1,0 +1,12 @@
+[project]
+name = "trading-app"
+version = "0.1.0"
+description = "A python app to perform algorithmic trading using the upstox rest api"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[all]>=0.115.8",
+    "schedule>=1.2.2",
+    "sqlmodel>=0.0.22",
+    "upstox-python-sdk>=2.10.0",
+]

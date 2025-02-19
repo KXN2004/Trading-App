@@ -1,4 +1,0 @@
-sqlalchemy
-python-dotenv
-upstox-python-sdk
-fastapi[standard]

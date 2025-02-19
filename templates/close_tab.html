@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You are Authenticated!</title>
+
+  <!-- Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg-light: #ffffff;
+      --text-light: #000000;
+      --bg-dark: #121212;
+      --text-dark: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      transition: background-color 1s, color 1s;
+      perspective: 1000px;
+      flex-direction: column;
+    }
+
+    /* Theme Backgrounds */
+    body.light-theme {
+      background-color: var(--bg-light);
+      color: var(--text-light);
+    }
+
+    body.dark-theme {
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    /* Upstox Auth Branding */
+    .upstox-branding {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-weight: 300;
+      font-size: 1.2rem;
+      letter-spacing: 2px;
+      transition: opacity 1s ease;
+    }
+
+    body.light-theme .upstox-branding {
+      color: #000000;
+    }
+
+    body.dark-theme .upstox-branding {
+      color: #ffffff;
+    }
+
+    /* Copyright Notice */
+    .copyright-notice {
+      position: absolute;
+      bottom: 10px;
+      width: 100%;
+      text-align: center;
+      font-size: 0.8rem;
+      opacity: 0;
+      animation: fadeIn 2s forwards;
+      transition: opacity 1s ease;
+    }
+
+    .copyright-notice a {
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    body.light-theme .copyright-notice {
+      color: #000000;
+    }
+
+    body.dark-theme .copyright-notice {
+      color: #ffffff;
+    }
+
+    .copyright-notice a {
+      color: inherit;
+    }
+
+    body.light-theme .copyright-notice a {
+      color: #000000;
+    }
+
+    body.dark-theme .copyright-notice a {
+      color: #ffffff;
+    }
+
+    body.light-theme .copyright-notice a:hover {
+      color: #0066cc;
+    }
+
+    body.dark-theme .copyright-notice a:hover {
+      color: #4da6ff;
+    }
+
+    /* Theme Toggle */
+    .theme-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+
+    body.light-theme .theme-toggle {
+      color: #000000;
+    }
+
+    body.dark-theme .theme-toggle {
+      color: #ffffff;
+    }
+
+    .theme-toggle:hover {
+      transform: rotate(45deg);
+    }
+
+    /* Main Content */
+    .content {
+      text-align: center;
+      z-index: 1;
+      animation: fadeIn 1s ease-out forwards;
+      transition: transform 1s ease;
+    }
+
+    body.dark-theme .content {
+      transform: rotateY(15deg);
+    }
+
+    body.light-theme .content {
+      transform: rotateY(-15deg);
+    }
+
+    h1 {
+      font-weight: 300;
+      font-size: 2.5rem;
+      transition: all 1s ease;
+      letter-spacing: 2px;
+    }
+
+    /* Keyframe animations */
+    @keyframes fadeIn {
+      0% {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Media Query for Mobile Responsiveness */
+    @media (max-width: 768px) {
+      body {
+        padding: 20px;
+        flex-direction: column;
+      }
+
+      h1 {
+        font-size: 2rem;
+      }
+
+      .theme-toggle {
+        top: 10px;
+        right: 10px;
+        font-size: 20px;
+      }
+
+      .copyright-notice {
+        bottom: 10px;
+        font-size: 0.9rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      .theme-toggle {
+        top: 5px;
+        right: 5px;
+        font-size: 18px;
+      }
+
+      .copyright-notice {
+        bottom: 10px;
+        font-size: 0.8rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="upstox-branding">Upstox Auth</div>
+
+  <button class="theme-toggle" aria-label="Toggle Theme">
+    <span class="material-icons">brightness_medium</span>
+  </button>
+
+  <div class="content">
+    <h1>Authentication Successful</h1>
+    <p>You can close this tab now</p>
+  </div>
+
+  <div class="copyright-notice">
+    Copyright &copy; 2025 <a href="https://github.com/kxn2004" target="_blank">Kevin Nadar</a>. All rights reserved.
+  </div>
+
+  <script>
+    // Theme management
+    const themeToggle = document.querySelector('.theme-toggle');
+    const body = document.body;
+    const themeIcon = themeToggle.querySelector('.material-icons');
+
+    // Media query for detecting system theme changes
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    // Initialize theme
+    const savedTheme = localStorage.getItem('theme') || 'auto';
+    setTheme(savedTheme);
+
+    // Listen for system theme changes when in auto mode
+    darkModeMediaQuery.addListener((e) => {
+      if (body.dataset.themeMode === 'auto') {
+        applySystemTheme();
+      }
+    });
+
+    // Theme toggle logic
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = body.dataset.themeMode || 'auto';
+      const themes = ['auto', 'light', 'dark'];
+      const nextThemeIndex = (themes.indexOf(currentTheme) + 1) % themes.length;
+      const nextTheme = themes[nextThemeIndex];
+
+      setTheme(nextTheme);
+    });
+
+    function applySystemTheme() {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        body.classList.remove('light-theme');
+        body.classList.add('dark-theme');
+      } else {
+        body.classList.remove('dark-theme');
+        body.classList.add('light-theme');
+      }
+    }
+
+    function setTheme(theme) {
+      // Remove existing theme classes
+      body.classList.remove('light-theme', 'dark-theme');
+
+      // Set theme mode data attribute
+      body.dataset.themeMode = theme;
+
+      // Update theme icon
+      switch (theme) {
+        case 'light':
+          body.classList.add('light-theme');
+          themeIcon.textContent = 'light_mode';
+          break;
+        case 'dark':
+          body.classList.add('dark-theme');
+          themeIcon.textContent = 'dark_mode';
+          break;
+        default: // auto
+          applySystemTheme();
+          themeIcon.textContent = 'brightness_medium';
+          break;
+      }
+
+      // Save theme preference
+      localStorage.setItem('theme', theme);
+    }
+  </script>
+</body>
+
+</html>
