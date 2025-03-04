@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     db_path: str
     login_url: str
-    redirect_url: str
+    redirect_uri: str
     model_config = SettingsConfigDict(env_file=".env")
 
 
@@ -29,3 +29,4 @@ CE = "CE"
 PE = "PE"
 NOT_AVAILABLE = "N/A"
 LIVE = "Live"
+TEMPLATES = "templates"

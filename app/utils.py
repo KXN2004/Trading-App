@@ -2,20 +2,16 @@ import calendar
 from datetime import date, timedelta
 from typing import List
 
-from httpx import get as get_request
-from sqlalchemy.exc import NoResultFound
-from sqlmodel import select
-
 from config import NIFTY, today
 from database import get_session
 from enums import Options, OrderType, Product, Status, TransactionType, Validity
+from httpx import get as get_request
 from models import Client, Clients, Credentials, Instruments, IronFly, Order
+from sqlmodel import select
 
 database = get_session()
 active_clients: list[Client] = list()
-for client in database.exec(
-    select(Credentials).where(Credentials.is_active)
-):  # TODO: If it doesn't work, try adding .all() method
+for client in database.exec(select(Credentials).where(Credentials.is_active)):
     active_clients.append(Client(client.client_id))
 
 
@@ -45,10 +41,10 @@ def get_symbol(strike: int, option: Options) -> str:
 def get_token(tradingsymbol: str) -> str:
     """Return the token of the given tradingsymbol"""
     database = get_session()
-    try:
-        return database.get(Instruments, tradingsymbol).instrument_key
-    except NoResultFound:
-        raise Exception("The given tradingsymbol is not in Instruments!")
+    result = database.get(Instruments, tradingsymbol)
+    if not result:
+        raise Exception("The tradingsymbol does not exist!")
+    return result.instrument_key
 
 
 def get_ltp(tradingsymbol: str) -> float:

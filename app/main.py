@@ -6,21 +6,24 @@ from typing import Iterable, List
 import schedule
 from database import get_session
 from enums import Options, Status
+from logger import logger as log
 from models import Client, FetchedOrder, IronFly, Strategies
 from sqlmodel import select
 from utils import (
     buy,
     close,
-    complete_rows,
     get_ask,
     get_bid,
     get_ltp,
     get_nifty_price,
     get_symbol,
     nearest_price,
-    open_rows,
     sell,
 )
+
+
+def now() -> str:
+    return datetime.now().strftime("%d %b %I:%M:%S %p")
 
 
 def initialize(namespace: SimpleNamespace):
@@ -58,7 +61,6 @@ def initialize(namespace: SimpleNamespace):
 
 def deploy_ironfly(namespace: SimpleNamespace, client: Client) -> None:
     new_trade = IronFly()
-    new_trade.created_at = datetime.now()
     new_trade.client_id = client.client_id
     new_trade.strike = namespace.strike
     new_trade.status = Status.OPEN
@@ -73,16 +75,29 @@ def deploy_ironfly(namespace: SimpleNamespace, client: Client) -> None:
         sell(new_trade.sell_pe_symbol, namespace.sell_pe_price),
         sell(new_trade.sell_ce_symbol, namespace.sell_ce_price),
     )
-
     for order in orders:
         setattr(new_trade, order["correlation_id"] + "_order_id", order["order_id"])
 
-    new_trade.save()
+    database = get_session()
+    database.add(new_trade)
+    database.commit()
+    database.close()
+    # try:
+    #     database.add(new_trade)
+    # except Exception as e:
+    #     log.info("Error while saving record to table:", e)
+    #     database.rollback()
+    # else:
+    #     database.commit()
+    # finally:
+    #     database.close()
 
 
-def update_order_status(database=get_session()):
-    print("Updating open orders on", datetime.now())
-    for row in open_rows():
+def update_order_status():
+    database = get_session()
+    open_rows = database.exec(select(IronFly).where(IronFly.status == Status.OPEN))
+    for row in open_rows:
+        log.info("Updating open order", id=row.id)
         orders = Client(row.client_id).fetch_orders()
         # The following filter block filters out the orders which are in the row
         base_columns = "buy_ce", "buy_pe", "sell_ce", "sell_pe"
@@ -131,12 +146,20 @@ def update_order_status(database=get_session()):
             row.low_adj = row.total - 0.7 * row.total + row.strike
             row.high_sl = 1.5 * row.sell_ce_price
             row.low_sl = 1.5 * row.sell_pe_price
-        row.save()
+
+        row.modified_at = now()
+        database.add(row)
+    database.commit()
+    database.close()
 
 
-def check_sl_and_adj(namespace: SimpleNamespace, database=get_session()) -> None:
-    print("Checking sl and adjusting on", datetime.now())
-    for row in complete_rows():
+def check_sl_and_adj(namespace: SimpleNamespace) -> None:
+    log.info("Checking sl and adjusting on", datetime.now())
+    database = get_session()
+    complete_rows = database.exec(
+        select(IronFly).where(IronFly.status == Status.COMPLETE)
+    )
+    for row in complete_rows:
         client = Client(row.client_id)
         sell_ce_ltp, sell_pe_ltp = get_ltp(
             ",".join(row.sell_ce_symbol, row.sell_pe_symbol)
@@ -180,10 +203,12 @@ def check_sl_and_adj(namespace: SimpleNamespace, database=get_session()) -> None
         #             close(row.buy_ce_symbol),
         #         )
         #     row.adj_status = row.status = Status.CLOSED
-        row.modified_at = datetime.now()
-        row.save(database)
+        row.modified_at = now()
+        database.add(row)
         # initialize(namespace)
         # deploy_ironfly(namespace)  # TODO: Deploy ironfly for that client
+    database.commit()
+    database.close()
 
 
 def deploy_ironfly_all(namespace: SimpleNamespace):
@@ -194,28 +219,28 @@ def deploy_ironfly_all(namespace: SimpleNamespace):
 
 def main():
     # if today.weekday() != 3:
-    #     print("Today is not a Thursday!")
+    #     log.info("Today is not a Thursday!")
     #     return
 
     # if day in last_two_thursdays(year, month):
-    #     print("Today is not the last or second last Thursday of the month!")
+    #     log.info("Today is not the last or second last Thursday of the month!")
     #     return
 
-    print("Will run at 03:10 p.m.")
-    print("Waiting for the scheduled jobs to run...")
+    log.info("Will run at 03:10 p.m.")
+    log.info("Waiting for the scheduled jobs to run...")
 
     namespace = SimpleNamespace()
 
     initialize(namespace)
     deploy_ironfly_all(namespace)
 
-    # update_order_status()
+    update_order_status()
 
     schedule.every(1).minute.do(update_order_status)
     schedule.every(1).minute.do(check_sl_and_adj, namespace)
 
-    # schedule.every().thursday.at("15:10").do(initialize, namespace)
-    # schedule.every().thursday.at("15:10").do(deploy_ironfly_all, namespace)
+    schedule.every().thursday.at("15:10").do(initialize, namespace)
+    schedule.every().thursday.at("15:10").do(deploy_ironfly_all, namespace)
 
     while True:
         schedule.run_pending()

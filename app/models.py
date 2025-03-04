@@ -1,15 +1,18 @@
-from copy import deepcopy
 from datetime import datetime
-from typing import Dict, List, Optional, Self
+from secrets import token_hex
+from typing import Dict, List, Optional
 
+from database import SQLModel, create_db_and_tables, get_session
+from enums import Status, TransactionType
 from httpx import get as get_request
 from httpx import post as post_request
 from pydantic import BaseModel
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Field, select
 
-from database import SQLModel, create_db_and_tables, get_session
-from enums import Status, TransactionType
+
+def now() -> str:
+    return datetime.now().strftime("%d %b %I:%M:%S %p")
 
 
 class Order(BaseModel):
@@ -80,69 +83,45 @@ class Instruments(SQLModel, table=True):
 
 
 class IronFly(SQLModel, table=True):
-    created_at: datetime = Field(primary_key=True, default_factory=datetime.now)
-    modified_at: datetime
+    id: str = Field(default_factory=lambda: token_hex(3), primary_key=True)
+    created_at: str = Field(default_factory=now)
+    modified_at: str = Field(default_factory=now)
     client_id: str = Field(foreign_key="credentials.client_id")
-    week: str
+    week: Optional[str] = "N/A"
 
-    buy_ce_order_id: str
-    buy_ce_symbol: str
-    buy_ce_price: float
-    buy_ce_status: str
-    buy_ce_message: str
+    buy_ce_order_id: Optional[str]
+    buy_ce_symbol: Optional[str]
+    buy_ce_price: Optional[float]
+    buy_ce_status: Optional[str]
+    buy_ce_message: Optional[str]
 
-    buy_pe_order_id: str
-    buy_pe_symbol: str
-    buy_pe_price: float
-    buy_pe_status: str
-    buy_pe_message: str
+    buy_pe_order_id: Optional[str]
+    buy_pe_symbol: Optional[str]
+    buy_pe_price: Optional[float]
+    buy_pe_status: Optional[str]
+    buy_pe_message: Optional[str]
 
-    sell_ce_order_id: str
-    sell_ce_symbol: str
-    sell_ce_price: float
-    sell_ce_status: str
-    sell_ce_message: str
+    sell_ce_order_id: Optional[str]
+    sell_ce_symbol: Optional[str]
+    sell_ce_price: Optional[float]
+    sell_ce_status: Optional[str]
+    sell_ce_message: Optional[str]
 
-    sell_pe_order_id: str
-    sell_pe_symbol: str
-    sell_pe_price: float
-    sell_pe_status: str
-    sell_pe_message: str
+    sell_pe_order_id: Optional[str]
+    sell_pe_symbol: Optional[str]
+    sell_pe_price: Optional[float]
+    sell_pe_status: Optional[str]
+    sell_pe_message: Optional[str]
 
-    total: int
-    strike: int
-    high_adj: int
-    low_adj: int
-    high_sl: float
-    low_sl: float
-    adj_status: str
-    sl_status: str
-    status: str
-
-    def save(self) -> Self:  # TODO: Remove add and check if it updates
-        """Save the current session to the database"""
-        session = get_session()
-        self.modified_at = datetime.now()
-        try:
-            session.add(deepcopy(self))  # TODO: Remove deepcopy and check
-        except Exception as e:
-            print(e)
-            session.rollback()
-        else:
-            session.commit()
-            session.refresh(self)  # TODO: Remove if it doesn't work
-            return self
-        finally:
-            session.close()
-
-    # def add(self, session: Session) -> None:
-    #     try:
-    #         session.commit()
-    #     except Exception as e:
-    #         print(e)
-    #         session.rollback()
-    #     finally:
-    #         session.close()
+    total: Optional[int]
+    strike: Optional[int]
+    high_adj: Optional[int]
+    low_adj: Optional[int]
+    high_sl: Optional[float]
+    low_sl: Optional[float]
+    adj_status: Optional[str]
+    sl_status: Optional[str]
+    status: Optional[str]
 
 
 class Client:

@@ -1,20 +1,13 @@
+from config import TRUE
+from database import get_session
 from models import Credentials
+from sqlmodel import select
 from upstox_client import LoginApi
 from upstox_client.rest import ApiException
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
 
-from config import DATABASE, TRUE
-
-schema = declarative_base().metadata
-
-engine = create_engine(f"sqlite:///{DATABASE}")
-
-Session = sessionmaker(bind=engine)
-
-database = Session()
-
+database = get_session()
 api_instance = LoginApi()
+active_clients = database.exec(select(Credentials).where(Credentials.is_active == TRUE))
 
 # FE6912: 251176 https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=abc493ca-87de-4730-bc61-c01ce7d76d27&state=FE6912&redirect_uri=https://manually-learning-cow.ngrok-free.app/callback
 # 42AFJE: 240220 https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=4386a770-aed7-4e7f-8cb2-663b778e4457&redirect_uri=https://account.upstox.com/contact-info/
@@ -22,10 +15,8 @@ api_instance = LoginApi()
 # 6GALGR: 653278 https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=465ab58e-8e35-4b09-a289-e813d59d73f0&redirect_uri=https://account.upstox.com/contact-info/
 # 2LCHHP: 653278 https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=8c9a6826-1b46-41a3-9492-7f3fe2d2ee71&redirect_uri=https://account.upstox.com/contact-info/
 
-active_clients = database.query(Credentials).filter_by(is_active=TRUE)
-
 for client in active_clients:
-    client = database.query(Credentials).filter_by(client_id=client.client_id).first()
+    client = database.get(Credentials, client.client_id)
 
     try:
         api_response = api_instance.token(
