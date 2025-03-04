@@ -53,9 +53,7 @@ def initialize(namespace: SimpleNamespace):
 
     namespace.iron_fly_clients: list[Client] = [  # type: ignore
         Client(client.client_id)
-        for client in database.exec(
-            select(Strategies).where(Strategies.iron_fly != 0)
-        )  # TODO: If not working, add .all() method
+        for client in database.exec(select(Strategies).where(Strategies.iron_fly != 0))
     ]
 
 
@@ -78,6 +76,7 @@ def deploy_ironfly(namespace: SimpleNamespace, client: Client) -> None:
     for order in orders:
         setattr(new_trade, order["correlation_id"] + "_order_id", order["order_id"])
 
+    log.info("Deploying ironfly", client=client.client_id)
     database = get_session()
     database.add(new_trade)
     database.commit()
@@ -97,7 +96,7 @@ def update_order_status():
     database = get_session()
     open_rows = database.exec(select(IronFly).where(IronFly.status == Status.OPEN))
     for row in open_rows:
-        log.info("Updating open order", id=row.id)
+        log.info("Updating open order", id=row.id, client=row.client_id)
         orders = Client(row.client_id).fetch_orders()
         # The following filter block filters out the orders which are in the row
         base_columns = "buy_ce", "buy_pe", "sell_ce", "sell_pe"
@@ -154,7 +153,7 @@ def update_order_status():
 
 
 def check_sl_and_adj(namespace: SimpleNamespace) -> None:
-    log.info("Checking sl and adjusting on", datetime.now())
+    log.info("Checking stoploss and adjusting accordingly")
     database = get_session()
     complete_rows = database.exec(
         select(IronFly).where(IronFly.status == Status.COMPLETE)
@@ -217,7 +216,17 @@ def deploy_ironfly_all(namespace: SimpleNamespace):
         deploy_ironfly(namespace, client)
 
 
-def main():
+def iron_fly() -> None:
+    namespace = SimpleNamespace()
+
+    initialize(namespace)
+    deploy_ironfly_all(namespace)
+
+    schedule.every().minute.do(update_order_status)
+    schedule.every().minute.do(check_sl_and_adj, namespace)
+
+
+def main() -> None:
     # if today.weekday() != 3:
     #     log.info("Today is not a Thursday!")
     #     return
@@ -226,26 +235,16 @@ def main():
     #     log.info("Today is not the last or second last Thursday of the month!")
     #     return
 
-    log.info("Will run at 03:10 p.m.")
-    log.info("Waiting for the scheduled jobs to run...")
+    log.info("This program will run at 03:10 p.m.")
+    log.info("Waiting for the scheduled jobs to run")
 
-    namespace = SimpleNamespace()
-
-    initialize(namespace)
-    deploy_ironfly_all(namespace)
-
-    update_order_status()
-
-    schedule.every(1).minute.do(update_order_status)
-    schedule.every(1).minute.do(check_sl_and_adj, namespace)
-
-    schedule.every().thursday.at("15:10").do(initialize, namespace)
-    schedule.every().thursday.at("15:10").do(deploy_ironfly_all, namespace)
+    schedule.every().day.at("03:10").do(iron_fly)
 
     while True:
         schedule.run_pending()
-        time.sleep(60)
+        time.sleep(1)
 
 
 if __name__ == "__main__":
+    log.info("Script started!")
     main()

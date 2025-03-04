@@ -2,22 +2,27 @@ from datetime import datetime, timedelta
 from sys import stdout
 
 from config import get_settings
+from logtail import LogtailHandler
 from loguru import logger
 
-
-def now() -> str:
-    return
-
-
 settings = get_settings()
+betterstack_handler = LogtailHandler(source_token=settings.betterstack_source_token)
 logger.remove()
 logger.add(
     stdout,
     colorize=True,
-    format="<green>{level}</green>:<cyan>{time:HH:mm:ss}</cyan>:<magenta>{file.name}</magenta>:<yellow>{function}</yellow>:<red>{line}</red> - <blue>{message}</blue> {extra}",
+    level="DEBUG",
+    # format="<green>{time:HH:mm:ss:SSSS}</green>:<red>{line}</red> - <blue>{message}</blue> <yellow>{extra}</yellow>",
+    format="<green>{time:HH:mm:ss:SSSS}</green>:<magenta>{file.name}</magenta>:<cyan>{function}</cyan>:<red>{line}</red> - <blue>{message}</blue> <yellow>{extra}</yellow>",
 )
 logger.add(
     f"logs/{datetime.today().strftime('%d-%m-%Y')}/{datetime.now().strftime('%I:%M:%S %p')}.log",
-    format="{level}:{time:HH:mm:ss}:{file.name}:{function}:{line} - {message} {extra}",
+    level="DEBUG",
+    format="{level}:{time:HH:mm:ss:SSS}:{file.name}:{function}:{line} - {message} {extra}",
     retention=timedelta(days=7),
 )
+logger.add(
+    betterstack_handler,
+    format="{level}:{time:HH:mm:ss:SSS}:{file.name}:{function}:{line} - {message} {extra}",
+)
+logger.info(settings.betterstack_source_token)
