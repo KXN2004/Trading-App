@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     db_path: str
     login_url: str
     redirect_uri: str
+    betterstack_source_token: str
     model_config = SettingsConfigDict(env_file=".env")
 
 

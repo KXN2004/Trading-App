@@ -6,6 +6,7 @@ from config import NIFTY, today
 from database import get_session
 from enums import Options, OrderType, Product, Status, TransactionType, Validity
 from httpx import get as get_request
+from logger import logger as log
 from models import Client, Clients, Credentials, Instruments, IronFly, Order
 from sqlmodel import select
 
@@ -47,6 +48,7 @@ def get_token(tradingsymbol: str) -> str:
     return result.instrument_key
 
 
+@log.catch(reraise=True)
 def get_ltp(tradingsymbol: str) -> float:
     """Return the last traded price of the given tradingsymbol"""
     token = get_token(tradingsymbol)
@@ -64,7 +66,7 @@ def get_ltp(tradingsymbol: str) -> float:
         ltp = response.json()["data"][instrument]["last_price"]
         return ltp
     except Exception as error:
-        print("Error when fetching LTP:", error)
+        log.error("Error when fetching LTP:", error)
 
 
 def get_bid(tradingsymbol: str) -> float:
