@@ -15,6 +15,7 @@ from utils import (
     get_ask,
     get_bid,
     get_ltp,
+    get_multiple_ltps,
     get_nifty_price,
     get_symbol,
     nearest_price,
@@ -98,6 +99,7 @@ def update_order_status():
     for row in open_rows:
         log.info("Updating open order", id=row.id, client=row.client_id)
         orders = Client(row.client_id).fetch_orders()
+        log.debug(orders=orders, client=row.client_id)
         # The following filter block filters out the orders which are in the row
         base_columns = "buy_ce", "buy_pe", "sell_ce", "sell_pe"
 
@@ -160,12 +162,14 @@ def check_sl_and_adj(namespace: SimpleNamespace) -> None:
     )
     for row in complete_rows:
         client = Client(row.client_id)
-        sell_ce_ltp, sell_pe_ltp = get_ltp(
-            ",".join(row.sell_ce_symbol, row.sell_pe_symbol)
-        )
+
+
+        sell_ce_ltp, sell_pe_ltp = get_multiple_ltps(row.sell_ce_symbol, row.sell_pe_symbol)
+        
         if sell_ce_ltp > row.high_sl and (
             row.sl_status != "all_exited" or row.sl_status != "ce_exited"
         ):
+            log.debug("Checking the last operation", last_operation=client.last_op)
             client.place_multiple_orders(
                 close(row.sell_ce_symbol), close(row.buy_ce_symbol)
             )
@@ -216,14 +220,9 @@ def deploy_ironfly_all(namespace: SimpleNamespace):
         deploy_ironfly(namespace, client)
 
 
-def iron_fly() -> None:
-    namespace = SimpleNamespace()
-
+def iron_fly(namespace: SimpleNamespace) -> None:
     initialize(namespace)
     deploy_ironfly_all(namespace)
-
-    schedule.every().minute.do(update_order_status)
-    schedule.every().minute.do(check_sl_and_adj, namespace)
 
 
 def main() -> None:
@@ -235,10 +234,14 @@ def main() -> None:
     #     log.info("Today is not the last or second last Thursday of the month!")
     #     return
 
-    log.info("This program will run at 03:10 p.m.")
     log.info("Waiting for the scheduled jobs to run")
 
-    schedule.every().day.at("03:10").do(iron_fly)
+    namespace = SimpleNamespace()
+
+    # schedule.every().minute.do(update_order_status)
+    schedule.every().minute.do(check_sl_and_adj, namespace)
+    schedule.every().day.at("23:31:00").do(iron_fly, namespace)
+
 
     while True:
         schedule.run_pending()
@@ -246,5 +249,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    log.info("Script started!")
     main()

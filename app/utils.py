@@ -61,13 +61,33 @@ def get_ltp(tradingsymbol: str) -> float:
                 "accept": "application/json",
                 "Authorization": f"Bearer {access_token}",
             },
-            params={"instrument_key": token},
+            params={"symbol": token},
         )
         ltp = response.json()["data"][instrument]["last_price"]
         return ltp
     except Exception as error:
         log.error("Error when fetching LTP:", error)
 
+def get_multiple_ltps(*args):
+    tokens = list()
+    instruments = list()
+    for tradingsymbol in args:
+        token = get_token(tradingsymbol)
+        tokens.append(token)
+        instruments.append(token.split("|")[0] + f":{tradingsymbol}")
+    access_token = get_access_token(active_clients[0])
+    try:
+        response = get_request(
+            url="https://api.upstox.com/v2/market-quote/ltp",
+            headers={
+                "accept": "application/json",
+                "Authorization": f"Bearer {access_token}",
+            },
+            params={"symbol": tokens},
+        )
+        return (response.json()["data"][instrument]["last_price"] for instrument in instruments)
+    except Exception as error:
+        log.error("Error when fetching LTP:", error)
 
 def get_bid(tradingsymbol: str) -> float:
     """Return the last traded price of the given tradingsymbol"""
@@ -220,5 +240,5 @@ def close(
         is_amo=is_amo,
         product=product,
         validity=validity,
-        order_type=OrderType.Market if price == 0 else OrderType.LIMIT,
+        order_type=OrderType.MARKET if price == 0 else OrderType.LIMIT,
     )
