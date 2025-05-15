@@ -3,7 +3,7 @@ from secrets import token_hex
 from typing import Dict, List, Optional
 
 from database import SQLModel, create_db_and_tables, get_session
-from enums import Status, TransactionType
+from enums import Status
 from httpx import get as get_request
 from httpx import post as post_request
 from pydantic import BaseModel
@@ -37,7 +37,7 @@ class FetchedOrder(BaseModel):
     trading_symbol: str
     status: str
     status_message: Optional[str]
-    price: float
+    average_price: float
 
 
 def get_symbol_token(instrument_key: str):
@@ -187,18 +187,6 @@ class Client:
     def place_multiple_orders(self, *args: Order) -> List[Dict[str, str]]:
         data: List[Order] = list()
         for order in args:
-            if order.transaction_type == TransactionType.CLOSE:
-                if (
-                    Client.last_op[self.client_id][order.instrument_token]
-                    == TransactionType.BUY
-                ):
-                    order.transaction_type = TransactionType.SELL
-                else:
-                    order.transaction_type = TransactionType.BUY
-
-            Client.last_op[self.client_id][order.instrument_token] = (
-                order.transaction_type
-            )
             order.quantity = self.strategy.iron_fly * 75
             order.correlation_id = "_".join(
                 (
@@ -217,6 +205,7 @@ class Client:
                     "Authorization": f"Bearer {self.access_token}",
                 },
             )
+
             order_ids = response.json()["data"]
             return order_ids
         except Exception as e:

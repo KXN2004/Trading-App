@@ -1,9 +1,10 @@
+from contextlib import asynccontextmanager
 from urllib.parse import urlencode
 
 from config import TEMPLATES, get_settings
 from database import Session, engine
+from database import get_session as database_session
 from fastapi import Depends, FastAPI, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -11,22 +12,26 @@ from fastapi.responses import (
     Response,
 )
 from models import Credentials
+from sqlmodel import update
 from upstox_client import LoginApi
 from upstox_client.rest import ApiException
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["GET"],
-)
 
 
 def get_session():
     with Session(engine) as session:
         yield session
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Reset the is_active attribute to 0 whenever the server starts
+    database: Session = database_session()
+    database.exec(update(Credentials).values(is_active=0))
+    database.commit()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -68,10 +73,12 @@ def callback(code: str, state: str, database=Depends(get_session)) -> Response:
             redirect_uri=settings.redirect_uri,
             grant_type="authorization_code",
         )
+        client.is_active = 1
+        client.access_token = login_info.access_token
+        database.commit()
+        with open(f"{TEMPLATES}/close_tab.html", "r") as close_tab_html:
+            return HTMLResponse(close_tab_html.read())
     except ApiException as e:
         print("Exception when calling LoginApi->token: %s\n" % e)
-    client.access_token = login_info.access_token
-    database.commit()
-    with open(f"{TEMPLATES}/close_tab.html", "r") as file:
-        close_tab_html = file.read()
-    return HTMLResponse(close_tab_html)
+        with open(f"{TEMPLATES}/internal_error.html", "r") as internal_error_html:
+            return HTMLResponse(internal_error_html.read())

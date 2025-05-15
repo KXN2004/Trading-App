@@ -7,7 +7,7 @@ from database import get_session
 from enums import Options, OrderType, Product, Status, TransactionType, Validity
 from httpx import get as get_request
 from logger import logger as log
-from models import Client, Clients, Credentials, Instruments, IronFly, Order
+from models import Client, Credentials, Instruments, IronFly, Order
 from sqlmodel import select
 
 database = get_session()
@@ -28,15 +28,24 @@ def last_two_thursdays(year, month: date.day) -> tuple[date.day, date.day]:
     return last_thursday.day, second_last_thursday.day
 
 
-def get_access_token(client: Clients) -> str:
+def get_access_token(client) -> str:
     """Return the access token of the given client"""
     database = get_session()
-    return database.get(Credentials, client.client_id).access_token
+    if isinstance(client, Client):
+        return database.get(Credentials, client.client_id).access_token
+    return database.get(Credentials, client).access_token
 
 
 def get_symbol(strike: int, option: Options) -> str:
     """Return the symbol of the given strike and option"""
-    return NIFTY + today.strftime("%y%b").upper() + str(strike) + option
+    _, last_day = calendar.monthrange(today.year, today.month)
+    last_day_date = date(today.year, today.month, last_day)
+    days_back = (last_day_date.weekday() - 3) % 7
+    last_thursday = last_day_date - timedelta(days=days_back)
+    if today >= last_thursday:
+        new_date = date(year=today.year, month=today.month + 1, day=today.day)
+        return "NIFTY" + new_date.strftime("%y%b").upper() + str(strike) + option
+    return "NIFTY" + today.strftime("%y%b").upper() + str(strike) + option
 
 
 def get_token(tradingsymbol: str) -> str:
@@ -45,6 +54,7 @@ def get_token(tradingsymbol: str) -> str:
     result = database.get(Instruments, tradingsymbol)
     if not result:
         raise Exception("The tradingsymbol does not exist!")
+    database.close()
     return result.instrument_key
 
 
@@ -68,6 +78,7 @@ def get_ltp(tradingsymbol: str) -> float:
     except Exception as error:
         log.error("Error when fetching LTP:", error)
 
+
 def get_multiple_ltps(*args):
     tokens = list()
     instruments = list()
@@ -85,9 +96,13 @@ def get_multiple_ltps(*args):
             },
             params={"symbol": tokens},
         )
-        return (response.json()["data"][instrument]["last_price"] for instrument in instruments)
+        return (
+            response.json()["data"][instrument]["last_price"]
+            for instrument in instruments
+        )
     except Exception as error:
         log.error("Error when fetching LTP:", error)
+
 
 def get_bid(tradingsymbol: str) -> float:
     """Return the last traded price of the given tradingsymbol"""
@@ -216,7 +231,7 @@ def sell(
         is_amo=is_amo,
         product=product,
         validity=validity,
-        order_type=OrderType.Market if price == 0 else OrderType.LIMIT,
+        order_type=OrderType.MARKET if price == 0 else OrderType.LIMIT,
     )
 
 

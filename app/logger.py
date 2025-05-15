@@ -27,4 +27,4 @@ logger.add(
     betterstack_handler,
     format="{level}:{time:HH:mm:ss:SSS}:{file.name}:{function}:{line} - {message} {extra}",
 )
-logger.info(f"Saving logs", log_file=log_file)
+logger.info("Saving logs", log_file=log_file)
