@@ -45,11 +45,10 @@ def login(client_id: str, database=Depends(get_session)) -> Response:
     client = database.query(Credentials).get(client_id)
     settings = get_settings()
     if client is None:
-        with open(f"{TEMPLATES}/unknown_user.html", "r") as f:
-            unknown_user_html = f.read()
-        return HTMLResponse(
-            status_code=status.HTTP_404_NOT_FOUND, content=unknown_user_html
-        )
+        with open(f"{TEMPLATES}/unknown_user.html", "r") as unknown_user_html:
+            return HTMLResponse(
+                content=unknown_user_html.read(), status_code=status.HTTP_404_NOT_FOUND
+            )
     query_params = {
         "client_id": client.api_key,
         "redirect_uri": settings.redirect_uri,
@@ -81,4 +80,7 @@ def callback(code: str, state: str, database=Depends(get_session)) -> Response:
     except ApiException as e:
         print("Exception when calling LoginApi->token: %s\n" % e)
         with open(f"{TEMPLATES}/internal_error.html", "r") as internal_error_html:
-            return HTMLResponse(internal_error_html.read())
+            return HTMLResponse(
+                content=internal_error_html.read(),
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
