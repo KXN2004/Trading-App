@@ -5,11 +5,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    db_path: str
+    database_driver: str
+    database_host: str
+    database_port: str
+    database_name: str
+    database_username: str
+    database_password: str
+
     login_url: str
     redirect_uri: str
+
     betterstack_source_token: str
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 @lru_cache()

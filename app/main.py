@@ -1,9 +1,9 @@
-import time
-from datetime import datetime
+from time import sleep
+from datetime import datetime, time
 from types import SimpleNamespace
 from typing import Iterable, List
 
-import schedule
+from schedule import run_pending, get_jobs, every, clear
 from database import get_session
 from enums import Options, OrderType, Status
 from httpx import put as put_request
@@ -11,6 +11,7 @@ from logger import logger as log
 from models import Client, FetchedOrder, IronFly, Strategies
 from sqlmodel import select
 from utils import (
+    get_clients,
     buy,
     get_access_token,
     get_ask,
@@ -83,7 +84,7 @@ def modify(namespace: SimpleNamespace):
             print("Error while modifying order", error)
     database.close()
 
-
+@log.catch(reraise=True)
 def initialize(namespace: SimpleNamespace):
     database = get_session()
 
@@ -163,9 +164,13 @@ def deploy_ironfly(namespace: SimpleNamespace, client: Client) -> None:
 
 
 def update_order_status():
-    log.info("Updating open orders")
     database = get_session()
     open_rows = database.exec(select(IronFly).where(IronFly.status == Status.OPEN))
+    if not list(open_rows):
+        log.info("No open rows found... Skipping...")
+        database.close()
+        return
+    log.info("Updating open orders")
     for row in open_rows:
         log.info("Updating row", row_id=row.id, client=row.client_id)
         orders = Client(row.client_id).fetch_orders()
@@ -237,11 +242,15 @@ def update_order_status():
 
 
 def check_sl_and_adj(namespace: SimpleNamespace) -> None:
-    log.info("Checking stoploss and adjusting accordingly of complete rows")
     database = get_session()
     complete_rows = database.exec(
         select(IronFly).where(IronFly.status == Status.COMPLETE)
     )
+    if not list(complete_rows):
+        log.info("No complete rows found... Skipping...")
+        database.close()
+        return
+    log.info("Checking stoploss and adjusting accordingly of complete rows")
     for row in complete_rows:
         log.info("Checking row", row=row.id, cliet=row.client_id)
         client = Client(row.client_id)
@@ -330,22 +339,32 @@ def iron_fly(namespace: SimpleNamespace) -> None:
 
 
 def main() -> None:
-    # if day in last_two_thursdays(year, month):
-    #     log.info("Today is not the last or second last Thursday of the month!")
-    #     return
-
-    log.info("Waiting for the scheduled jobs to run")
-
     namespace = SimpleNamespace()
-    initialize(namespace)
-    schedule.every().minute.do(update_order_status)
-    schedule.every().minute.do(modify, namespace)
-    schedule.every().minute.do(check_sl_and_adj, namespace)
-    # schedule.every().day.at("15:10:00").do(iron_fly, namespace)
+    every().day.do(initialize, namespace)
+    every().minute.do(update_order_status)
+    every().minute.do(modify, namespace)
+    every().minute.do(check_sl_and_adj, namespace)
+    every().day.at("15:10:00", "Asia/Kolkata").do(iron_fly, namespace)
+    every().day.at("15:31:00", "Asia/Kolkata").do(lambda: clear())
 
     while True:
-        schedule.run_pending()
-        time.sleep(1)
+        # if day in last_two_thursdays(year, month):
+        #     log.info("Today is not the last or second last Thursday of the month!")
+        #     return
+        now_ist = datetime.now().astimezone().time()
+        if now_ist < time(9, 15):
+            log.info("Waiting for market to open... Retrying in 60 seconds...")
+            sleep(60)
+            continue
+        if not get_clients():
+            log.info("No active clients found.. Retrying in 60 seconds...")
+            sleep(60)
+            continue
+        if not get_jobs():
+            log.info("Market is closed... Exiting the script...")
+            break
+        run_pending()
+        sleep(1)
 
 
 if __name__ == "__main__":

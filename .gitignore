@@ -168,3 +168,4 @@ cython_debug/
 # Database files
 *.db
 *.sqlite
+init/

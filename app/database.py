@@ -1,10 +1,18 @@
 from config import get_settings
 from sqlmodel import Session, SQLModel, create_engine
+from sqlalchemy import URL
 
 settings = get_settings()
-sqlite_url = f"sqlite:///{settings.db_path}"
-connection_args = {"check_same_thread": False}
-engine = create_engine(url=sqlite_url, connect_args=connection_args)
+postgres_url = URL(
+    drivername=settings.database_driver,
+    host=settings.database_host,
+    port=settings.database_port,
+    database=settings.database_name,
+    username=settings.database_username,
+    password=settings.database_password,
+    query={},
+)
+engine = create_engine(postgres_url, max_overflow=-1)
 
 
 def create_db_and_tables() -> None:

@@ -1,0 +1,54 @@
+services:
+  postgres-database:
+    image: "postgres:alpine"
+    container_name: "postgres-database"
+    restart: "on-failure"
+    ports:
+      - "5432:5432"
+    env_file:
+      - ".env"
+    environment:
+      - "POSTGRES_PASSWORD=${DATABASE_PASSWORD}"
+      - "POSTGRES_USER=${DATABASE_USERNAME}"
+      - "POSTGRES_DB=${DATABASE_NAME}"
+    volumes:
+      - "./init:/docker-entrypoint-initdb.d"
+      - "postgres_data:/var/lib/postgresql/data"
+
+  fastapi-server:
+    container_name: "fastapi-server"
+    build:
+      context: "."
+      target: server
+    depends_on:
+      - "postgres-database"
+    ports:
+      - "8000:8000"
+    env_file:
+      - ".env"
+
+  trading-app:
+    container_name: "trading-app"
+    build:
+      context: "."
+      target: app
+    depends_on:
+      - "postgres-database"
+    env_file:
+      - ".env"
+    volumes:
+      - "app_logs:/app/logs"
+
+  ngrok-service:
+    image: "ngrok/ngrok:latest"
+    container_name: "ngrok-service"
+    network_mode: "host"
+    env_file:
+      - ".env"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: http --url=manually-learning-cow.ngrok-free.app 8000
+
+volumes:
+  app_logs:
+  postgres_data:

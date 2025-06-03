@@ -6,10 +6,10 @@
 
 **/.DS_Store
 **/__pycache__
+**/init
 **/.venv
 **/.classpath
 **/.dockerignore
-**/.env
 **/.git
 **/.gitignore
 **/.project
@@ -20,6 +20,7 @@
 **/*.*proj.user
 **/*.dbmdl
 **/*.jfm
+**/*.env
 **/bin
 **/charts
 **/docker-compose*
@@ -30,5 +31,10 @@
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
+**/logs
+**/docker
+**/*.txt
+**/*.csv
+**/*.sqlite
 LICENSE
 README.md

@@ -10,10 +10,13 @@ from logger import logger as log
 from models import Client, Credentials, Instruments, IronFly, Order
 from sqlmodel import select
 
-database = get_session()
-active_clients: list[Client] = list()
-for client in database.exec(select(Credentials).where(Credentials.is_active)):
-    active_clients.append(Client(client.client_id))
+def get_clients() -> list[Client]:
+    """Return a list of active clients"""
+    database = get_session()
+    active_clients: list[Client] = list()
+    for client in database.exec(select(Credentials).where(Credentials.is_active == 1)):
+        active_clients.append(Client(client.client_id))
+    return active_clients
 
 
 def last_two_thursdays(year, month: date.day) -> tuple[date.day, date.day]:
@@ -47,7 +50,6 @@ def get_symbol(strike: int, option: Options) -> str:
         return "NIFTY" + new_date.strftime("%y%b").upper() + str(strike) + option
     return "NIFTY" + today.strftime("%y%b").upper() + str(strike) + option
 
-
 def get_token(tradingsymbol: str) -> str:
     """Return the token of the given tradingsymbol"""
     database = get_session()
@@ -63,7 +65,7 @@ def get_ltp(tradingsymbol: str) -> float:
     """Return the last traded price of the given tradingsymbol"""
     token = get_token(tradingsymbol)
     instrument = token.split("|")[0] + f":{tradingsymbol}"
-    access_token = get_access_token(active_clients[0])
+    access_token = get_access_token(get_clients()[0])
     try:
         response = get_request(
             url="https://api.upstox.com/v2/market-quote/ltp",
@@ -86,7 +88,7 @@ def get_multiple_ltps(*args):
         token = get_token(tradingsymbol)
         tokens.append(token)
         instruments.append(token.split("|")[0] + f":{tradingsymbol}")
-    access_token = get_access_token(active_clients[0])
+    access_token = get_access_token(get_clients()[0])
     try:
         response = get_request(
             url="https://api.upstox.com/v2/market-quote/ltp",
@@ -108,7 +110,7 @@ def get_bid(tradingsymbol: str) -> float:
     """Return the last traded price of the given tradingsymbol"""
     token = get_token(tradingsymbol)
     instrument = token.split("|")[0] + f":{tradingsymbol}"
-    access_token = get_access_token(active_clients[0])
+    access_token = get_access_token(get_clients()[0])
     try:
         response = get_request(
             url="https://api.upstox.com/v2/market-quote/quotes",
@@ -128,7 +130,7 @@ def get_ask(tradingsymbol: str) -> float:
     """Return the last traded price of the given tradingsymbol"""
     token = get_token(tradingsymbol)
     instrument = token.split("|")[0] + f":{tradingsymbol}"
-    access_token = get_access_token(active_clients[0])
+    access_token = get_access_token(get_clients()[0])
     try:
         response = get_request(
             url="https://api.upstox.com/v2/market-quote/quotes",
@@ -147,7 +149,7 @@ def get_ask(tradingsymbol: str) -> float:
 def get_nifty_price() -> float:
     """Return the last traded price of NIFTY"""
     token = get_token(NIFTY)
-    access_token = get_access_token(active_clients[0])
+    access_token = get_access_token(get_clients()[0])
     try:
         response = get_request(
             url="https://api.upstox.com/v2/market-quote/ltp",
@@ -160,8 +162,7 @@ def get_nifty_price() -> float:
         ltp = response.json()["data"][token.replace("|", ":")]["last_price"]
         return ltp
     except Exception as error:
-        print("Error when fetching nifty price:", error)
-
+        raise Exception("Error when fetching nifty price:", error)
 
 def nearest_price(price: float, step: int = 50) -> int:
     """Return the nearest price to the given price with the given step"""
