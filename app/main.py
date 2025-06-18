@@ -3,12 +3,12 @@ from datetime import datetime, time
 from types import SimpleNamespace
 from typing import Iterable, List
 
-from schedule import run_pending, get_jobs, every, clear
+from schedule import get_jobs, every, run_pending as run_pending_jobs
 from database import get_session
 from enums import Options, OrderType, Status
 from httpx import put as put_request
 from logger import logger as log
-from models import Client, FetchedOrder, IronFly, Strategies
+from models import Client, FetchedOrder, IronFly, Strategies, Credentials
 from sqlmodel import select
 from utils import (
     get_clients,
@@ -34,7 +34,6 @@ def modify(namespace: SimpleNamespace):
         select(IronFly).where(IronFly.sell_ce_status != Status.COMPLETE)
     )
     for row in ce_open_rows:
-        log.debug("fgx")
         access_token = get_access_token(row.client_id)
         body = {
             "validity": "DAY",
@@ -111,9 +110,14 @@ def initialize(namespace: SimpleNamespace):
 
     namespace.total = namespace.sell_ce_price + namespace.sell_pe_price
 
-    namespace.iron_fly_clients: list[Client] = [  # type: ignore
+    namespace.iron_fly_clients: list[Client] = [
         Client(client.client_id)
-        for client in database.exec(select(Strategies).where(Strategies.iron_fly != 0))
+        for client in database.exec(
+            select(Strategies)
+            .join(Credentials, Credentials.client_id == Strategies.client_id)
+            .where(Credentials.is_active == 1)
+            .where(Strategies.iron_fly != 0)
+        )
     ]
 
 
@@ -147,7 +151,6 @@ def deploy_ironfly(namespace: SimpleNamespace, client: Client) -> None:
     new_trade.buy_pe_symbol = namespace.buy_pe_symbol
     new_trade.sell_ce_symbol = namespace.sell_ce_symbol
     new_trade.sell_pe_symbol = namespace.sell_pe_symbol
-
     orders = client.place_multiple_orders(
         buy(new_trade.buy_pe_symbol),
         buy(new_trade.buy_ce_symbol),
@@ -165,12 +168,13 @@ def deploy_ironfly(namespace: SimpleNamespace, client: Client) -> None:
 
 def update_order_status():
     database = get_session()
-    open_rows = database.exec(select(IronFly).where(IronFly.status == Status.OPEN))
-    if not list(open_rows):
+    open_rows = database.exec(select(IronFly).where(IronFly.status == Status.OPEN)).all()
+    if not open_rows:
         log.info("No open rows found... Skipping...")
         database.close()
         return
     log.info("Updating open orders")
+    database_updated = False
     for row in open_rows:
         log.info("Updating row", row_id=row.id, client=row.client_id)
         orders = Client(row.client_id).fetch_orders()
@@ -192,7 +196,6 @@ def update_order_status():
             order_ids=[order.order_id for order in row_orders],
         )
         for order in row_orders:
-            print("Should print")
             log.info("Updating order", order_id=order.order_id, client=row.client_id)
             prefix = "_".join(
                 (order.transaction_type, order.trading_symbol[-2:])
@@ -236,17 +239,21 @@ def update_order_status():
         row.modified_at = now()
         database.add(row)
         log.info("Added row updates to the Database Session", sesssion=database.info)
+        if database.is_modified(row):
+            log.info("Row has been modified", row_id=row.id)
+            database_updated = True
+        else:
+            log.info("Row has not been modified", row_id=row.id)
     database.commit()
     database.close()
-    log.info("Commited and closed the Database Session")
+    if database_updated:
+        log.info("Commited and closed the Database Session")
 
 
 def check_sl_and_adj(namespace: SimpleNamespace) -> None:
     database = get_session()
-    complete_rows = database.exec(
-        select(IronFly).where(IronFly.status == Status.COMPLETE)
-    )
-    if not list(complete_rows):
+    complete_rows = database.exec(select(IronFly).where(IronFly.status == Status.COMPLETE)).all()
+    if not complete_rows:
         log.info("No complete rows found... Skipping...")
         database.close()
         return
@@ -327,15 +334,10 @@ def check_sl_and_adj(namespace: SimpleNamespace) -> None:
     log.info("Commited and closed the Database Session")
 
 
-def deploy_ironfly_all(namespace: SimpleNamespace):
-    iron_fly_clients: List[Client] = namespace.iron_fly_clients
-    for client in iron_fly_clients:
-        deploy_ironfly(namespace, client)
-
-
-def iron_fly(namespace: SimpleNamespace) -> None:
+def iron_fly(namespace: SimpleNamespace):
     initialize(namespace)
-    deploy_ironfly_all(namespace)
+    for client in namespace.iron_fly_clients:
+        deploy_ironfly(namespace, client)
 
 
 def main() -> None:
@@ -344,26 +346,22 @@ def main() -> None:
     every().minute.do(update_order_status)
     every().minute.do(modify, namespace)
     every().minute.do(check_sl_and_adj, namespace)
-    every().day.at("15:10:00", "Asia/Kolkata").do(iron_fly, namespace)
-    every().day.at("15:31:00", "Asia/Kolkata").do(lambda: clear())
-
+    every().thursday.at("15:10:00").do(iron_fly, namespace)
+    market_closed_message_displayed = client_not_logged_in_message_displayed = False
     while True:
-        # if day in last_two_thursdays(year, month):
-        #     log.info("Today is not the last or second last Thursday of the month!")
-        #     return
-        now_ist = datetime.now().astimezone().time()
-        if now_ist < time(9, 15):
-            log.info("Waiting for market to open... Retrying in 60 seconds...")
+        if datetime.now().time() < time(9, 15):
+            if not market_closed_message_displayed:
+                log.info("Market is closed... Waiting for market to open...")
+                market_closed_message_displayed = True
             sleep(60)
             continue
         if not get_clients():
-            log.info("No active clients found.. Retrying in 60 seconds...")
+            if not client_not_logged_in_message_displayed:
+                log.info("No active clients found.. Waiting for clients to log in...")
+                client_not_logged_in_message_displayed = True
             sleep(60)
             continue
-        if not get_jobs():
-            log.info("Market is closed... Exiting the script...")
-            break
-        run_pending()
+        run_pending_jobs()
         sleep(1)
 
 

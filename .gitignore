@@ -166,6 +166,4 @@ cython_debug/
 *.ipynb
 
 # Database files
-*.db
-*.sqlite
 init/

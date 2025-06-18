@@ -20,33 +20,41 @@ Trading App is a Python-based application designed for algorithmic trading using
 
 ```
 .
-├── .dockerignore          # Specifies files to ignore when building Docker images
-├── .env                   # Environment variables configuration file
-├── .gitignore             # Specifies files to ignore in Git version control
-├── api.py                 # FastAPI application and route definitions
-├── close_tab.html         # HTML template for closing a tab
-├── config.py              # Configuration settings for the application
-├── docker-compose.yml     # Docker Compose configuration for multi-container applications
-├── Dockerfile             # Instructions to build the Docker image
-├── enums.py               # Enumerations used in the application
-├── main.py                # Main script to run the application
-├── models.py              # SQLAlchemy models for database tables
-├── pyproject.toml         # Project metadata and dependencies
-├── README.md              # Project documentation
-├── requirements.txt       # Python dependencies
-├── Token.py               # Token management for authentication
-├── unknown_user.html      # HTML template for unknown user page
-└── utils.py               # Utility functions used across the application
+├── app/                       # The directory containing the main application
+│   ├── api.py                 # FastAPI application and route definitions
+│   ├── config.py              # Configuration settings for the application
+│   ├── database.py            # File containeing the database connection
+│   ├── enums.py               # Enumerations used in the application
+│   ├── logger.py              # File containing the app logger
+│   ├── main.py                # Main script to run the application
+│   ├── models.py              # SQLAlchemy models for database tables
+│   └── utils.py               # Utility functions used across the application
+├── templates/                 # The directory containing the html templates
+│   ├── close_tab.html         # HTML template for closing a tab
+│   ├── internal_error.html    # HTML template for internal errors
+│   └── unknown_user.html      # HTML template for unknown user page
+├── .dockerignore              # Specifies files to ignore when building Docker images
+├── .gitignore                 # Specifies files to ignore in Git version control
+├── .env                       # Environment variables configuration file
+├── .env.example               # Environment variables configuration Examples
+├── Dockerfile                 # Instructions to build the Docker image
+├── compose.yml                # Docker Compose configuration for multi-container applications
+├── favicon.ico                # Favicon for the frontend web page
+├── pyproject.toml             # Project metadata and dependencies
+├── README.md                  # Project documentation
+└── uv.lock                    # UV Lock File
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - Docker (optional, for containerized deployment)
 
-### Installation
+### Setting up the Application
+
+0. Download and install [uv](https://docs.astral.sh/uv/getting-started/installation/) onto your system
 
 1. Clone the repository:
     ```sh
@@ -54,18 +62,7 @@ Trading App is a Python-based application designed for algorithmic trading using
     cd trading-app
     ```
 
-2. Create a virtual environment and activate it:
-    ```sh
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-    ```
-
-3. Install the required dependencies:
-    ```sh
-    pip install -r requirements.txt
-    ```
-
-4. Set up the environment variables:
+2. Set up the environment variables:
     ```sh
     cp .env.example .env
     # Edit the .env file to include your database path and API keys
@@ -75,21 +72,22 @@ Trading App is a Python-based application designed for algorithmic trading using
 
 1. Start the FastAPI server:
     ```sh
-    uvicorn api:app --reload
+    uv run fastapi run app/api.py
     ```
+    > Note: Make sure you're in the root of the project directory when running the above command
 
-2. Access the application at `http://localhost:8000`.
+2. Access the application at `http://localhost:8000` or at `http://127.0.0.1:8000`.
 
 ### Using Docker
 
-1. Build the Docker image:
+1. Start the Docker Compose:
     ```sh
-    docker build -t trading-app .
+    docker compose up
     ```
 
-2. Run the Docker container:
+2. Stop the Docker Compose:
     ```sh
-    docker run -p 80:80 trading-app
+    docker compose down
     ```
 
 ## Usage
